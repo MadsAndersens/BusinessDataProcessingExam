@@ -18,7 +18,7 @@ if __name__ == "__main__":
 #        # Example: Create a table
 #        create_table_query = """
 #              CREATE TABLE "Buildings" (
-#                "building_id" int PRIMARY KEY NOT NULL,
+#                "building_id" varchar PRIMARY KEY NOT NULL,
 #                "construction_year" int,
 #                "ussage_code" int,
 #                "collected_area" int,
@@ -32,12 +32,12 @@ if __name__ == "__main__":
 #                "floors" int,
 #                "heating_source_id" int,
 #                "alternate_heating_source_id" int,
-#                "carport" bool,
+#                "carport" int,
 #                "plot_id" varchar,
 #                "municipality_id" varchar,
 #                "longitude" float,
 #                "lattitude" float,
-#                "asbestos_present" bool
+#                "asbestos_code" int
 #              );
 #        """
 #        db.execute_query(create_table_query)

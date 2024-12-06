@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from utils.bbr_data import *
 from utils.database import PostgresDB
+from tqdm import tqdm
 
 
 # Define the ETL script, that runs the ETL process for a given municipality
@@ -11,9 +12,8 @@ class BuildingETL:
         self.municipality_id = municipality_id
         self.adress_csv_path = f'Data/Adress_data/Adress_data_{self.municipality_id}.csv'
         self.dawa_data = self.fetch_adress_data()
-
+        self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
         self.bbr_data = None
-        self.db = None
 
     def fetch_adress_data(self):
         if self.adress_csv_path not in os.listdir('Data/Adress_data'):
@@ -38,8 +38,8 @@ class BuildingETL:
         return bbr_data
     
     def run_etl(self) -> None:
-        
-        for idx, row in self.dawa_data.iterrows():
+        self.db.connect()
+        for idx, row in tqdm(self.dawa_data.iterrows(), total=len(self.dawa_data)):
             adgangs_adresse_id = row['adgangspunktid']
             lattitude, longitude = row['vejpunkt_x'], row['vejpunkt_y']
 
@@ -47,69 +47,91 @@ class BuildingETL:
             bbr_data = self.get_bbr_data(adgangs_adresse_id)
 
             # Write the data to the database
-            print(bbr_data)
-            break
-            #self.write_to_database(bbr_data, lattitude, longitude)
+            self.write_to_database(bbr_data, lattitude, longitude)
+            
+
+            if idx == 10:
+                break
+
+        self.db.close()
     
-    def write_to_database(self, bbr_data: List[Building], lattitude: float, longitude: float) -> None:
-        # Initialize the database connection
-        self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
-
+    def write_to_database(self,
+                          bbr_data: List[Building],
+                          lattitude: float,
+                          longitude: float) -> None:
+        # Write the data to the database
         try:
-            self.db.connect()
-
             for building in bbr_data:
                 # Example: Insert a row into the table
                 insert_query = """
                 INSERT INTO "Buildings" (
-                  "Building_Id",
-                  "construction_year",
-                  "ussage_code",
-                  "collected_area",
-                  "industry_area",
-                  "foot_print_area",
-                  "outer_wall_meterial",
-                  "roof_material",
-                  "floors",
-                  "heating_source_id",
-                  "shelter_space",
-                  "lattitude",
-                  "longitude"
+                    building_id,
+                    construction_year,
+                    ussage_code,
+                    collected_area,
+                    industry_area,
+                    housing_area,
+                    foot_print_area,
+                    outer_wall_meterial,
+                    roof_material,
+                    water_supply,
+                    drainage,
+                    floors,
+                    heating_source_id,
+                    alternate_heating_source_id,
+                    carport,
+                    plot_id,
+                    municipality_id,
+                    longitude,
+                    lattitude,
+                    asbestos_code
                 ) VALUES ( 
-                    %(Building_Id)s,
+                    %(building_id)s,
                     %(construction_year)s,
                     %(ussage_code)s,
                     %(collected_area)s,
                     %(industry_area)s,
+                    %(housing_area)s,
                     %(foot_print_area)s,
                     %(outer_wall_meterial)s,
                     %(roof_material)s,
+                    %(water_supply)s,
+                    %(drainage)s,
                     %(floors)s,
                     %(heating_source_id)s,
-                    %(shelter_space)s,
+                    %(alternate_heating_source_id)s,
+                    %(carport)s,
+                    %(plot_id)s,
+                    %(municipality_id)s,
+                    %(longitude)s,
                     %(lattitude)s,
-                    %(longitude)s
-                    );
-                    """
+                    %(asbestos_code)s
+                );
+                """
                 params = {
-                    "Building_Id": building.id_lokalId,
-                    "construction_year": building.opførelsesår,
-                    "ussage_code": building.bygningensAnvendelse,
-                    "collected_area": building.samletBygningsareal,
-                    "industry_area": building.erhvervsareal,
-                    "foot_print_area": building.bebyggetAreal,
-                    "outer_wall_meterial": building.ydermurkonsistens,
-                    "roof_material": building.tagdækningsmateriale,
-                    "floors": building.etagerAntal,
-                    "heating_source_id": building.opvarmningsform,
-                    "shelter_space": building.tagkonstruktion,
-                    "lattitude": lattitude,
-                    "longitude": longitude
-                }
+                            "building_id": building.id_lokalId,
+                            "construction_year": building.byg026Opførelsesår,
+                            "ussage_code": building.byg021BygningensAnvendelse,
+                            "collected_area": building.byg038SamletBygningsareal,
+                            "housing_area": building.byg039BygningensSamledeBoligAreal,
+                            "foot_print_area": building.byg041BebyggetAreal,
+                            "industry_area": building.byg040BygningensSamledeErhvervsAreal,
+                            "outer_wall_meterial": building.byg032YdervæggensMateriale,
+                            "roof_material": building.byg033Tagdækningsmateriale,
+                            "water_supply": building.byg030Vandforsyning,
+                            "drainage": building.byg031Afløbsforhold,
+                            "floors": building.byg054AntalEtager,
+                            "heating_source_id": building.byg056Varmeinstallation,
+                            "alternate_heating_source_id": building.byg058SupplerendeVarme,
+                            "carport": building.byg043ArealIndByggetCarport,
+                            "plot_id": building.grund,
+                            "municipality_id": building.kommunekode,
+                            "asbestos_code": building.byg036AsbestholdigtMateriale,
+                            "longitude": longitude,
+                            "lattitude": lattitude
+                            }
                 self.db.execute_query(insert_query, params)
 
-        finally:
-            self.db.close()
-            print("Data successfully written to database.")
-        
-
+        # Write to error log for the db log
+        except Exception as e:
+            self.db.write_error_log(f"Building ETL Failed with error: {e}")

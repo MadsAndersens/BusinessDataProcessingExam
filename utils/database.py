@@ -24,6 +24,7 @@ class PostgresDB:
         self.host = host
         self.port = port
         self.connection = None
+        self.error_log_path = "error_logs/db_log.txt"
 
     def connect(self):
         """Establish a connection to the database."""
@@ -45,7 +46,7 @@ class PostgresDB:
             self.connection.close()
             print("Database connection closed.")
 
-    def execute_query(self, query, params=None):
+    def execute_query(self, query: str, params=None) -> None:
         """
         Execute a query that modifies the database (e.g., INSERT, UPDATE, DELETE).
 
@@ -62,7 +63,7 @@ class PostgresDB:
             self.connection.rollback()
             raise
 
-    def fetch_data(self, query, params=None):
+    def fetch_data(self, query: str, params=None) -> list:
         """
         Fetch data from the database.
 
@@ -78,3 +79,12 @@ class PostgresDB:
         except Exception as e:
             print(f"Error fetching data: {e}")
             raise
+    
+    def write_error_log(self, error_message: str)-> None:
+        """
+        Write an error message to the error log file.
+
+        :param error_message: Error message to write to the log file
+        """
+        with open(self.error_log_path, "a") as file:
+            file.write(error_message + "\n")

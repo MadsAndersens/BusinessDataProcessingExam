@@ -7,38 +7,28 @@ import json
 import os
 
 class Building(BaseModel):
-    datafordelerOpdateringstid: datetime
-    byg021BygningensAnvendelse: str
-    byg026Opførelsesår: int
-    byg030Vandforsyning: str
-    byg031Afløbsforhold: str
-    byg032YdervæggensMateriale: str
-    byg033Tagdækningsmateriale: str
-    byg037KildeTilBygningensMaterialer: str
-    byg038SamletBygningsareal: int
-    byg039BygningensSamledeBoligAreal: int
-    byg040BygningensSamledeErhvervsAreal: int
-    byg041BebyggetAreal: int
-    byg053BygningsarealerKilde: str
-    byg054AntalEtager: int
-    byg056Varmeinstallation: str
-    byg058SupplerendeVarme: str
-    byg094Revisionsdato: datetime
-    byg133KildeTilKoordinatsæt: str
-    byg134KvalitetAfKoordinatsæt: str
-    byg135SupplerendeOplysningOmKoordinatsæt: str
-    byg136PlaceringPåSøterritorie: str
-    byg404Koordinat: str
-    byg406Koordinatsystem: str
-    forretningshændelse: str
-    forretningsområde: str
-    grund: str
-    husnummer: str
     id_lokalId: str
+    datafordelerOpdateringstid: datetime
+    grund: str 
     jordstykke: str
     kommunekode: str
     status: str
-    byg036AsbestholdigtMateriale: str = '5'
+    husnummer: str
+    byg021BygningensAnvendelse: str = None
+    byg026Opførelsesår: int = None
+    byg030Vandforsyning: str = None
+    byg031Afløbsforhold: str = None
+    byg032YdervæggensMateriale: str = None
+    byg033Tagdækningsmateriale: str = None
+    byg037KildeTilBygningensMaterialer: str = None
+    byg038SamletBygningsareal: int = 0
+    byg039BygningensSamledeBoligAreal: int  = 0
+    byg040BygningensSamledeErhvervsAreal: int = 0
+    byg041BebyggetAreal: int = 0
+    byg054AntalEtager: int = 1
+    byg056Varmeinstallation: str = None
+    byg058SupplerendeVarme: str = None
+    byg036AsbestholdigtMateriale: int = 5
     byg043ArealIndByggetCarport: int = 0
 
 # Since the buildings are returned as a list for that specific entrance point ID
@@ -48,7 +38,6 @@ def validate_json_data(response) -> None:
     
     # Now validate the reponse as a string representation of the JSON data
     response_str = json.dumps(response.json(),ensure_ascii=False)
-    print(response_str)
     person_list_adapter.validate_json(response_str)
 
 def load_pydantic_model(response: requests.Response) -> List[Building]:
