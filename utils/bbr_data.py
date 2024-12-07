@@ -10,7 +10,6 @@ class Building(BaseModel):
     id_lokalId: str
     datafordelerOpdateringstid: datetime
     grund: str 
-    jordstykke: str
     kommunekode: str
     status: str
     husnummer: str

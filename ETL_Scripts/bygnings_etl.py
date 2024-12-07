@@ -1,8 +1,12 @@
 import pandas as pd 
 import os
+from time import sleep
+from tqdm import tqdm
+
+#Internal imports: 
 from utils.bbr_data import *
 from utils.database import PostgresDB
-from tqdm import tqdm
+from utils.dawa_data import *
 
 
 # Define the ETL script, that runs the ETL process for a given municipality
@@ -11,19 +15,15 @@ class BuildingETL:
     def __init__(self, municipality_id: str):
         self.municipality_id = municipality_id
         self.adress_csv_path = f'Data/Adress_data/Adress_data_{self.municipality_id}.csv'
-        self.dawa_data = self.fetch_adress_data()
+        self.fetch_adress_data()
         self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
         self.bbr_data = None
 
-    def fetch_adress_data(self):
-        if self.adress_csv_path not in os.listdir('Data/Adress_data'):
+    def fetch_adress_data(self) -> None:
+        if f'Adress_data_{self.municipality_id}.csv' not in os.listdir('Data/Adress_data'):
             url = f'https://api.dataforsyningen.dk/adgangsadresser?kommunekode={self.municipality_id}&format=csv'
-            dawa_data = pd.read_csv(url)
+            dawa_data = pd.read_csv(url) # Fetch the data and save it to a csv file
             dawa_data.to_csv(self.adress_csv_path, index=False)
-        else: 
-            dawa_data = pd.read_csv(self.adress_csv_path)
-
-        return dawa_data
 
     def get_bbr_data(self, adgangs_adresse_id: str) -> List[Building]:
         #Lookup the data from the BBR API
@@ -39,26 +39,45 @@ class BuildingETL:
     
     def run_etl(self) -> None:
         self.db.connect()
-        for idx, row in tqdm(self.dawa_data.iterrows(), total=len(self.dawa_data)):
-            adgangs_adresse_id = row['adgangspunktid']
-            lattitude, longitude = row['vejpunkt_x'], row['vejpunkt_y']
+        for idx, row in tqdm(enumerate(load_adress_data(self.adress_csv_path))):
+            adgangs_adresse_id = row.id
+            lattitude, longitude = row.vejpunkt_x, row.vejpunkt_y
+            road_name = row.adresseringsvejnavn
+            house_number = row.husnr
+            postal_code = row.postnr
+            postal_code_name = row.postnrnavn
 
             #Get the BBR data for the given adgangs_adresse_id
             bbr_data = self.get_bbr_data(adgangs_adresse_id)
 
-            # Write the data to the database
-            self.write_to_database(bbr_data, lattitude, longitude)
-            
+            # Check if the data is empty
+            if len(bbr_data) == 0:
+                continue
 
-            if idx == 10:
-                break
+            # Write the data to the database
+            self.write_to_database( adgangs_adresse_id,
+                                    bbr_data,
+                                    lattitude,
+                                    longitude,
+                                    house_number,
+                                    road_name,
+                                    postal_code)
+            
+            # For every 100 rows take a 5 second break
+            if idx % 100 == 0:
+                sleep(5)
 
         self.db.close()
     
     def write_to_database(self,
+                          adgangs_adresse_id: str,
                           bbr_data: List[Building],
                           lattitude: float,
-                          longitude: float) -> None:
+                          longitude: float,
+                          house_number: int,
+                          road_name: str,
+                          postal_code: int
+                          ) -> None:
         # Write the data to the database
         try:
             for building in bbr_data:
@@ -84,7 +103,10 @@ class BuildingETL:
                     municipality_id,
                     longitude,
                     lattitude,
-                    asbestos_code
+                    asbestos_code,
+                    house_number,
+                    road_name,
+                    postal_code
                 ) VALUES ( 
                     %(building_id)s,
                     %(construction_year)s,
@@ -105,7 +127,10 @@ class BuildingETL:
                     %(municipality_id)s,
                     %(longitude)s,
                     %(lattitude)s,
-                    %(asbestos_code)s
+                    %(asbestos_code)s,
+                    %(house_number)s,
+                    %(road_name)s,
+                    %(postal_code)s
                 );
                 """
                 params = {
@@ -128,7 +153,10 @@ class BuildingETL:
                             "municipality_id": building.kommunekode,
                             "asbestos_code": building.byg036AsbestholdigtMateriale,
                             "longitude": longitude,
-                            "lattitude": lattitude
+                            "lattitude": lattitude,
+                            "house_number": house_number,
+                            "road_name": road_name,
+                            "postal_code": postal_code
                             }
                 self.db.execute_query(insert_query, params)
 

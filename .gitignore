@@ -1,3 +1,5 @@
 /Data
 .env
 /error_logs
+Pipfile
+Pipfile.lock

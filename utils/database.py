@@ -1,6 +1,6 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
+import os 
 
 class PostgresDB:
     def __init__(self,
@@ -57,7 +57,6 @@ class PostgresDB:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, params)
                 self.connection.commit()
-                print("Query executed successfully.")
         except Exception as e:
             print(f"Error executing query: {e}")
             self.connection.rollback()
@@ -88,3 +87,43 @@ class PostgresDB:
         """
         with open(self.error_log_path, "a") as file:
             file.write(error_message + "\n")
+
+
+def create_building_table():
+    # Initialize the database connection
+    db = PostgresDB("BuildingData","Mads",os.environ['DB_PASSWORD'])
+    try:
+        db.connect()
+
+        # Example: Create a table
+        create_table_query = """
+                            CREATE TABLE "Buildings" (
+                              "building_id" varchar PRIMARY KEY NOT NULL,
+                              "construction_year" int,
+                              "ussage_code" int,
+                              "collected_area" int,
+                              "industry_area" int,
+                              "housing_area" int,
+                              "foot_print_area" int,
+                              "outer_wall_meterial" int,
+                              "roof_material" int,
+                              "water_supply" int,
+                              "drainage" int,
+                              "floors" int,
+                              "heating_source_id" int,
+                              "alternate_heating_source_id" int,
+                              "carport" int,
+                              "plot_id" varchar,
+                              "municipality_id" varchar,
+                              "longitude" float,
+                              "lattitude" float,
+                              "asbestos_code" int,
+                              "house_number" varchar,
+                              "road_name" varchar,
+                              "postal_code" int
+                            );
+                      """
+        db.execute_query(create_table_query)
+
+    finally:
+        db.close()
