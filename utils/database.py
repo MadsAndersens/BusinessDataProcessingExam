@@ -105,3 +105,24 @@ def init_db() -> None:
 
     finally:
         db.close()
+
+def populate_road_name_table() -> None:
+    """
+    Populate the road_name table in the database with data from the csv file.
+    """
+    # Initialize the database connection
+    db = PostgresDB("BuildingData","Mads",os.environ['DB_PASSWORD'])
+    try:
+        # Connect to the database
+        db.connect()
+
+        # Read the data from the csv file
+        with open("Data/road_names.csv", "r") as file:
+            next(file)  # Skip the header row
+            for line in file:
+                road_name = line.strip()
+                # Insert the road name into the database
+                db.execute_query("INSERT INTO road_name (road_name) VALUES (%s)", (road_name,))
+
+    finally:
+        db.close()

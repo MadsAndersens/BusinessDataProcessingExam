@@ -8,6 +8,8 @@ from haversine import haversine, Unit
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from utils.database import PostgresDB
+
 
 #Define pydantic model for the school data
 class School(BaseModel):
@@ -21,6 +23,51 @@ class School(BaseModel):
     class Config:
         allow_population_by_field_name = True
 
+    #ensure longitude and latitude are floats
+    @property
+    def location(self):
+        return (self.latitude, self.longitude)
+    
+def format_school_data(school_data: pd.DataFrame) -> pd.DataFrame:
+    school_data['latitude'] = school_data['latitude'].str.replace(',', '.').astype(float)
+    school_data['longitude'] = school_data['longitude'].str.replace(',', '.').astype(float)
+    school_data['10_yr_avg'] = school_data['10_yr_avg'].str.replace(',', '.').astype(float)
+    return school_data
+
+def populate_school_dimension() -> None:
+    """
+    Populate the school dimension table in the database with data from the csv file.
+    """
+    # Initialize the database connection
+    db = PostgresDB("BuildingData", "Mads", os.environ['DB_PASSWORD'])
+    try:
+        # Connect to the database
+        db.connect()
+
+        # Read the data from the csv file
+        school_data = format_school_data(pd.read_csv("Data/school_data.csv"))
+
+        # Loop through create datamodel and write to the database
+        #First define base query
+        q = f"""
+                INSERT INTO school (school_id, school_name, longitude, latitude, school_gpa)
+                VALUES
+            """ 
+        for idx, row in school_data.iterrows():
+            school = School(**row.to_dict()) # Convert the row to a pydantic model to ensure data integrity
+            q += f"({school.school_id}, '{school.school_name}', {school.longitude}, {school.latitude}, {school.ten_yr_avg})"
+            
+            # Adding the comma if its not the last row
+            if idx != len(school_data) - 1:
+                q += ","
+
+        # Insert the data into the database
+        db.execute_query(q)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        db.close()
 
 def lookup_nearest_school(lattitude: float, longitude: float) -> School:
     """
@@ -37,10 +84,7 @@ def lookup_nearest_school(lattitude: float, longitude: float) -> School:
         school_pipe = SchoolsPipeline()
         school_data = school_pipe.run_pipeline()
     else:
-        school_data = pd.read_csv(school_csv)
-        school_data['latitude'] = school_data['latitude'].str.replace(',', '.').astype(float)
-        school_data['longitude'] = school_data['longitude'].str.replace(',', '.').astype(float)
-        school_data['10_yr_avg'] = school_data['10_yr_avg'].str.replace(',', '.').astype(float)
+        school_data = format_school_data(pd.read_csv(school_csv))
     
     #Get the closest school by calculating the distance to each school from the given location
     distances = []
