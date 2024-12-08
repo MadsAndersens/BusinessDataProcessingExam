@@ -87,11 +87,8 @@ class BuildingETL:
                                     closest_school
                                     )
             
-            if idx == 20:
-                break
-            
             # For every 100 rows take a 5 second break
-            if idx % 100 == 0:
+            if idx % 500 == 0:
                 sleep(5)
 
         self.db.close()
@@ -154,7 +151,9 @@ class BuildingETL:
                     tram_id,
                     tram_distance,
                     school_id,
-                    school_distance
+                    school_distance,
+                    adgangs_adresse_id,
+                    updated_at
                 ) VALUES ( 
                     %(building_id)s,
                     %(construction_year)s,
@@ -191,8 +190,11 @@ class BuildingETL:
                     %(tram_id)s,
                     %(tram_distance)s,
                     %(school_id)s,
-                    %(school_distance)s
-                );
+                    %(school_distance)s,
+                    %(adgangs_adresse_id)s,
+                    NOW()
+                )
+                ON CONFLICT (building_id) DO NOTHING;
                 """
             params = {
                 "building_id": building.id_lokalId,
@@ -227,7 +229,8 @@ class BuildingETL:
                 "tram_id": tram_station.station_id,
                 "tram_distance": tram_station.distance,
                 "school_id": closest_school.school_id,
-                "school_distance": closest_school.distance
+                "school_distance": closest_school.distance,
+                "adgangs_adresse_id": adgangs_adresse_id
             }
             self.db.execute_query(insert_query, params)
 
