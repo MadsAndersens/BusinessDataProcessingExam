@@ -2,11 +2,14 @@ import pandas as pd
 import os
 from time import sleep
 from tqdm import tqdm
+from pydantic import BaseModel
 
 #Internal imports: 
 from utils.bbr_data import *
 from utils.database import PostgresDB
 from utils.dawa_data import *
+from utils.school_utils import lookup_nearest_school, School
+from utils.public_transport import get_nearest_station
 
 
 # Define the ETL script, that runs the ETL process for a given municipality
@@ -37,6 +40,11 @@ class BuildingETL:
 
         return bbr_data
     
+    def get_closest_school(self, lattitude: float, longitude: float) -> str:
+        #Lookup the data from the csv file with schools gathered from the schools pipeline: 
+        school = lookup_nearest_school(lattitude, longitude)
+        return school
+
     def run_etl(self) -> None:
         self.db.connect()
         for idx, row in tqdm(enumerate(load_adress_data(self.adress_csv_path))):
@@ -53,6 +61,15 @@ class BuildingETL:
             # Check if the data is empty
             if len(bbr_data) == 0:
                 continue
+            
+            # Get the closest school to the building
+            closest_school = self.get_closest_school(lattitude, longitude)
+
+            # Get the closest stations to the building
+            metro_station = get_nearest_station(lattitude, longitude, 'metro')
+            s_train_station = get_nearest_station(lattitude, longitude, 'train')
+            bus_station = get_nearest_station(lattitude, longitude, 'bus')
+            tram_station = get_nearest_station(lattitude, longitude, 'tram')
 
             # Write the data to the database
             self.write_to_database( adgangs_adresse_id,
@@ -61,7 +78,13 @@ class BuildingETL:
                                     longitude,
                                     house_number,
                                     road_name,
-                                    postal_code)
+                                    postal_code,
+                                    metro_station,
+                                    s_train_station,
+                                    bus_station,
+                                    tram_station,
+                                    closest_school
+                                    )
             
             # For every 100 rows take a 5 second break
             if idx % 100 == 0:
@@ -76,8 +99,13 @@ class BuildingETL:
                           longitude: float,
                           house_number: int,
                           road_name: str,
-                          postal_code: int
-                          ) -> None:
+                          postal_code: int,
+                          metro_station: BaseModel,
+                          s_train_station: BaseModel,
+                          bus_station: BaseModel,
+                          tram_station: BaseModel,
+                          closest_school: School
+                        ) -> None:
         # Write the data to the database
         try:
             for building in bbr_data:

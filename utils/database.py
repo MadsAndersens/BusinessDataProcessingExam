@@ -88,42 +88,20 @@ class PostgresDB:
         with open(self.error_log_path, "a") as file:
             file.write(error_message + "\n")
 
-
-def create_building_table():
+def init_db() -> None:
+    """
+    Initialize the database by creating the necessary tables.
+    """
     # Initialize the database connection
     db = PostgresDB("BuildingData","Mads",os.environ['DB_PASSWORD'])
     try:
+        # Connect to the database
         db.connect()
 
-        # Example: Create a table
-        create_table_query = """
-                            CREATE TABLE "Buildings" (
-                              "building_id" varchar PRIMARY KEY NOT NULL,
-                              "construction_year" int,
-                              "ussage_code" int,
-                              "collected_area" int,
-                              "industry_area" int,
-                              "housing_area" int,
-                              "foot_print_area" int,
-                              "outer_wall_meterial" int,
-                              "roof_material" int,
-                              "water_supply" int,
-                              "drainage" int,
-                              "floors" int,
-                              "heating_source_id" int,
-                              "alternate_heating_source_id" int,
-                              "carport" int,
-                              "plot_id" varchar,
-                              "municipality_id" varchar,
-                              "longitude" float,
-                              "lattitude" float,
-                              "asbestos_code" int,
-                              "house_number" varchar,
-                              "road_name" varchar,
-                              "postal_code" int
-                            );
-                      """
-        db.execute_query(create_table_query)
+        # Execute the sql file to create the tables
+        with open("utils/Create_DB.sql", "r") as file:
+            create_tables_query = file.read()
+            db.execute_query(create_tables_query)
 
     finally:
         db.close()
