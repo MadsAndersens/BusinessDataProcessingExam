@@ -29,6 +29,7 @@ class BuildingETL:
             dawa_data.to_csv(self.adress_csv_path, index=False)
 
     def get_bbr_data(self, adgangs_adresse_id: str) -> List[Building]:
+        
         #Lookup the data from the BBR API
         bbr_data = lookup_bbr_data(adgangs_adresse_id)
 
@@ -86,6 +87,9 @@ class BuildingETL:
                                     closest_school
                                     )
             
+            if idx == 20:
+                break
+            
             # For every 100 rows take a 5 second break
             if idx % 100 == 0:
                 sleep(5)
@@ -111,7 +115,13 @@ class BuildingETL:
             for building in bbr_data:
                 # Example: Insert a row into the table
                 insert_query = """
-                INSERT INTO "Buildings" (
+                WITH road_name_inserted AS (
+                    INSERT INTO road_name (road_name)
+                    VALUES (%(road_name)s)
+                    ON CONFLICT (road_name) DO NOTHING
+                    RETURNING road_name_id
+                )
+                INSERT INTO "buildings" (
                     building_id,
                     construction_year,
                     ussage_code,
@@ -119,10 +129,10 @@ class BuildingETL:
                     industry_area,
                     housing_area,
                     foot_print_area,
-                    outer_wall_meterial,
-                    roof_material,
-                    water_supply,
-                    drainage,
+                    outer_wall_material_id,
+                    roof_material_id,
+                    water_supply_id,
+                    drainage_id,
                     floors,
                     heating_source_id,
                     alternate_heating_source_id,
@@ -133,8 +143,18 @@ class BuildingETL:
                     lattitude,
                     asbestos_code,
                     house_number,
-                    road_name,
-                    postal_code
+                    road_name_id,
+                    postal_code,
+                    metro_id,
+                    metro_distance,
+                    s_train_id,
+                    s_train_distance,
+                    bus_id,
+                    bus_distance,
+                    tram_id,
+                    tram_distance,
+                    school_id,
+                    school_distance
                 ) VALUES ( 
                     %(building_id)s,
                     %(construction_year)s,
@@ -143,10 +163,10 @@ class BuildingETL:
                     %(industry_area)s,
                     %(housing_area)s,
                     %(foot_print_area)s,
-                    %(outer_wall_meterial)s,
-                    %(roof_material)s,
-                    %(water_supply)s,
-                    %(drainage)s,
+                    %(outer_wall_material_id)s,
+                    %(roof_material_id)s,
+                    %(water_supply_id)s,
+                    %(drainage_id)s,
                     %(floors)s,
                     %(heating_source_id)s,
                     %(alternate_heating_source_id)s,
@@ -157,36 +177,59 @@ class BuildingETL:
                     %(lattitude)s,
                     %(asbestos_code)s,
                     %(house_number)s,
-                    %(road_name)s,
-                    %(postal_code)s
+                    COALESCE(
+                        (SELECT road_name_id FROM road_name_inserted),
+                        (SELECT road_name_id FROM road_name WHERE road_name = %(road_name)s)
+                    ),
+                    %(postal_code)s,
+                    %(metro_id)s,
+                    %(metro_distance)s,
+                    %(s_train_id)s,
+                    %(s_train_distance)s,
+                    %(bus_id)s,
+                    %(bus_distance)s,
+                    %(tram_id)s,
+                    %(tram_distance)s,
+                    %(school_id)s,
+                    %(school_distance)s
                 );
                 """
-                params = {
-                            "building_id": building.id_lokalId,
-                            "construction_year": building.byg026Opførelsesår,
-                            "ussage_code": building.byg021BygningensAnvendelse,
-                            "collected_area": building.byg038SamletBygningsareal,
-                            "housing_area": building.byg039BygningensSamledeBoligAreal,
-                            "foot_print_area": building.byg041BebyggetAreal,
-                            "industry_area": building.byg040BygningensSamledeErhvervsAreal,
-                            "outer_wall_meterial": building.byg032YdervæggensMateriale,
-                            "roof_material": building.byg033Tagdækningsmateriale,
-                            "water_supply": building.byg030Vandforsyning,
-                            "drainage": building.byg031Afløbsforhold,
-                            "floors": building.byg054AntalEtager,
-                            "heating_source_id": building.byg056Varmeinstallation,
-                            "alternate_heating_source_id": building.byg058SupplerendeVarme,
-                            "carport": building.byg043ArealIndByggetCarport,
-                            "plot_id": building.grund,
-                            "municipality_id": building.kommunekode,
-                            "asbestos_code": building.byg036AsbestholdigtMateriale,
-                            "longitude": longitude,
-                            "lattitude": lattitude,
-                            "house_number": house_number,
-                            "road_name": road_name,
-                            "postal_code": postal_code
-                            }
-                self.db.execute_query(insert_query, params)
+            params = {
+                "building_id": building.id_lokalId,
+                "construction_year": building.byg026Opførelsesår,
+                "ussage_code": building.byg021BygningensAnvendelse,
+                "collected_area": building.byg038SamletBygningsareal,
+                "housing_area": building.byg039BygningensSamledeBoligAreal,
+                "foot_print_area": building.byg041BebyggetAreal,
+                "industry_area": building.byg040BygningensSamledeErhvervsAreal,
+                "outer_wall_material_id": building.byg032YdervæggensMateriale,
+                "roof_material_id": building.byg033Tagdækningsmateriale,
+                "water_supply_id": building.byg030Vandforsyning,
+                "drainage_id": building.byg031Afløbsforhold,
+                "floors": building.byg054AntalEtager,
+                "heating_source_id": building.byg056Varmeinstallation,
+                "alternate_heating_source_id": building.byg058SupplerendeVarme,
+                "carport": building.byg043ArealIndByggetCarport,
+                "plot_id": building.grund,
+                "municipality_id": building.kommunekode,
+                "asbestos_code": building.byg036AsbestholdigtMateriale,
+                "longitude": longitude,
+                "lattitude": lattitude,
+                "house_number": house_number,
+                "road_name": road_name,
+                "postal_code": postal_code,
+                "metro_id": metro_station.station_id,
+                "metro_distance": metro_station.distance,
+                "s_train_id": s_train_station.station_id,
+                "s_train_distance": s_train_station.distance,
+                "bus_id": bus_station.station_id,
+                "bus_distance": bus_station.distance,
+                "tram_id": tram_station.station_id,
+                "tram_distance": tram_station.distance,
+                "school_id": closest_school.school_id,
+                "school_distance": closest_school.distance
+            }
+            self.db.execute_query(insert_query, params)
 
         # Write to error log for the db log
         except Exception as e:

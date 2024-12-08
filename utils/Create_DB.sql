@@ -34,7 +34,7 @@ CREATE TABLE postal_area (
 );
 
 CREATE TABLE road_name (
-  road_name_id int PRIMARY KEY NOT NULL,
+  road_name_id SERIAL PRIMARY KEY NOT NULL,
   road_name varchar
 );
 
@@ -73,6 +73,11 @@ CREATE TABLE tram (
   lattitude float,
   longitude float
 );
+
+CREATE TABLE building_ussage (
+  ussage_code int PRIMARY KEY NOT NULL
+  ussage_description varchar
+)
 
 CREATE TABLE Buildings (
   building_id varchar PRIMARY KEY NOT NULL,
@@ -121,4 +126,5 @@ CREATE TABLE Buildings (
   FOREIGN KEY (s_train_id) REFERENCES s_train (s_train_id),
   FOREIGN KEY (tram_id) REFERENCES tram (tram_id),
   FOREIGN KEY (bus_id) REFERENCES bus (bus_id)
+  FOREIGN KEY (ussage_code) REFERENCES building_ussage (ussage_code)
 );

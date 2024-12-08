@@ -16,6 +16,7 @@ class School(BaseModel):
     longitude: float = Field(..., ge=-180.0, le=180.0, description="The longitude of the school, must be between -180 and 180")
     latitude: float = Field(..., ge=-90.0, le=90.0, description="The latitude of the school, must be between -90 and 90")
     ten_yr_avg: float = Field(..., alias="10_yr_avg", description="The 10-year average value for the school")
+    distance: Optional[float] = Field(None, description="The distance from the given location to the school")
 
     class Config:
         allow_population_by_field_name = True
@@ -37,6 +38,9 @@ def lookup_nearest_school(lattitude: float, longitude: float) -> School:
         school_data = school_pipe.run_pipeline()
     else:
         school_data = pd.read_csv(school_csv)
+        school_data['latitude'] = school_data['latitude'].str.replace(',', '.').astype(float)
+        school_data['longitude'] = school_data['longitude'].str.replace(',', '.').astype(float)
+        school_data['10_yr_avg'] = school_data['10_yr_avg'].str.replace(',', '.').astype(float)
     
     #Get the closest school by calculating the distance to each school from the given location
     distances = []

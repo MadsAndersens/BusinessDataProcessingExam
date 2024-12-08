@@ -4,35 +4,11 @@ from pydantic import BaseModel, Field
 
 
 #Define metro station data model
-class MetroStation(BaseModel):
-    station_id: str = Field(alias='id')
-    station_name: str = Field(alias='navn')
-    lattitude: float = Field(alias='koordinater')
-    longitude: float = Field(alias='koordinater')
-    distance: float = None
-
-#Define s-train station data model
-class STrainStation(BaseModel):
-    station_id: str = Field(alias='id')
-    station_name: str = Field(alias='navn')
-    lattitude: float = Field(alias='koordinater')
-    longitude: float = Field(alias='koordinater')
-    distance: float = None
-
-#Define bus station data model
-class BusStation(BaseModel):
-    station_id: str = Field(alias='id')
-    station_name: str = Field(alias='navn')
-    lattitude: float = Field(alias='koordinater')
-    longitude: float = Field(alias='koordinater')
-    distance: float = None
-
-#Define tram station data model
-class TramStation(BaseModel):
-    station_id: str = Field(alias='id')
-    station_name: str = Field(alias='navn')
-    lattitude: float = Field(alias='koordinater')
-    longitude: float = Field(alias='koordinater')
+class Station(BaseModel):
+    station_id: int
+    station_name: str
+    latitude: float 
+    longitude: float
     distance: float = None
 
 
@@ -44,18 +20,25 @@ def get_nearest_station(lattitude: float,
     """
     #Load the stations data
     stations = pd.read_csv('Data/stations.csv')
+    stations['latitude'] = stations['latitude'].str.replace(',','.').astype(float)
+    stations['longitude'] = stations['longitude'].str.replace(',','.').astype(float)
+
+    #Filter the stations based on the station type
     stations = stations[stations[station_type] == 1][["station_name","station_id","latitude","longitude"]]
 
     #Create a pydantic model for the stations
-    stations = stations.apply(lambda row: MetroStation(**row.to_dict()), axis=1)
+    stations = [Station(**station.to_dict()) for _,station in stations.iterrows()]
     
     #Find the closest station
     closest_station = None
     min_distance = float('inf')
     for station in stations:
-        distance = haversine((lattitude, longitude), (station.lattitude, station.longitude), unit=Unit.METERS)
+        distance = haversine((lattitude, longitude), (station.latitude, station.longitude), unit=Unit.METERS)
         if distance < min_distance:
             min_distance = distance
             closest_station = station
+    
+    #Set the distance to the closest station
+    closest_station.distance = min_distance
 
     return closest_station
