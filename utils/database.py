@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os 
+import pandas as pd
 
 class PostgresDB:
     def __init__(self,
@@ -60,9 +61,9 @@ class PostgresDB:
         except Exception as e:
             print(f"Error executing query: {e}")
             self.connection.rollback()
-            raise
+            self.write_error_log(f"Error executing query: {e}")
 
-    def fetch_data(self, query: str, params=None) -> list:
+    def fetch_data(self, query: str, params=None, as_df: bool = False) -> list:
         """
         Fetch data from the database.
 
@@ -74,7 +75,10 @@ class PostgresDB:
             with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(query, params)
                 results = cursor.fetchall()
-                return results
+                if as_df:
+                    return pd.DataFrame(results)
+                else:
+                    return results
         except Exception as e:
             print(f"Error fetching data: {e}")
             raise

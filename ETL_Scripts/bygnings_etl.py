@@ -22,6 +22,10 @@ class BuildingETL:
         self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
         self.bbr_data = None
 
+        #Temporary fix to avoid duplicates
+        self.db.connect()
+        self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
+
     def fetch_adress_data(self) -> None:
         if f'Adress_data_{self.municipality_id}.csv' not in os.listdir('Data/Adress_data'):
             url = f'https://api.dataforsyningen.dk/adgangsadresser?kommunekode={self.municipality_id}&format=csv'
@@ -35,6 +39,9 @@ class BuildingETL:
 
         #Load the data into the pydantic model
         bbr_data = load_pydantic_model(bbr_data)
+
+        if len(bbr_data) == 0:
+            return bbr_data
 
         #Check if the status of the building is active
         bbr_data = [item for item in bbr_data if item.status == '6']
@@ -50,6 +57,12 @@ class BuildingETL:
         self.db.connect()
         for idx, row in tqdm(enumerate(load_adress_data(self.adress_csv_path))):
             adgangs_adresse_id = row.id
+
+            # Check if the data is already in the database
+            if adgangs_adresse_id in self.ids_in_db:
+                continue
+
+            #Extract the data from the row
             lattitude, longitude = row.vejpunkt_x, row.vejpunkt_y
             road_name = row.adresseringsvejnavn
             house_number = row.husnr

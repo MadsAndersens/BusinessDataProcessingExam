@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 from datetime import datetime
 import json 
 import os
+import time
 
 class Building(BaseModel):
     id_lokalId: str
@@ -45,13 +46,23 @@ def load_pydantic_model(response: requests.Response) -> List[Building]:
     try:
         validate_json_data(response)
     except Exception as e:
-        raise ValueError(f"Data did not fit model {e}")
+        write_error_log(f"Error validating JSON data: {e}")
+        return []
     
     #Unpack the data into the pydantic model: 
     data = [Building(**item) for item in response.json()]
 
     return data
-    
+
+def write_error_log(error_message: str)-> None:
+    """
+    Write an error message to the error log file.
+
+    :param error_message: Error message to write to the log file
+    """
+    with open("error_logs/bbr_log.txt", "a") as file:
+        file.write(error_message + "\n")
+
 
 # Usage example
 def parse_building_data(data: List[dict]) -> List[Building]:
@@ -72,4 +83,13 @@ def lookup_bbr_data(adgangsadresse_id: str) -> requests.Response:
 
     # Brug HTTP Basic Authentication til at sende brugernavn og adgangskode
     response = requests.get(bbr_url, params=params)
+
+    # Check if the request was successful
+    if response.status_code != 200:
+        #Wait for 5 seconds and try again
+        time.sleep(5)
+        response = requests.get(bbr_url, params=params)
+        if response.status_code != 200:
+            raise ValueError(f"Failed to get data from BBR API. Status code: {response.status_code}")
+    
     return response
