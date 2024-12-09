@@ -3,3 +3,4 @@
 /error_logs
 Pipfile
 Pipfile.lock
+**.pyc

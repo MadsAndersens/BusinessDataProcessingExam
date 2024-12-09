@@ -3,6 +3,8 @@ import os
 from time import sleep
 from tqdm import tqdm
 from pydantic import BaseModel
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Semaphore
 
 #Internal imports: 
 from utils.bbr_data import *
@@ -21,10 +23,11 @@ class BuildingETL:
         self.fetch_adress_data()
         self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
         self.bbr_data = None
+        self.semaphore = Semaphore(100)  # Limit the number of concurrent threads to 100
 
         #Temporary fix to avoid duplicates
-        self.db.connect()
-        self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
+        #self.db.connect()
+        #self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
 
     def fetch_adress_data(self) -> None:
         if f'Adress_data_{self.municipality_id}.csv' not in os.listdir('Data/Adress_data'):
@@ -55,54 +58,56 @@ class BuildingETL:
 
     def run_etl(self) -> None:
         self.db.connect()
-        for idx, row in tqdm(enumerate(load_adress_data(self.adress_csv_path))):
-            adgangs_adresse_id = row.id
+        rows = list(load_adress_data(self.adress_csv_path))
+        
+        def process_row(row):
+            with self.semaphore:  # Ensure no more than 100 threads access this block
+                adgangs_adresse_id = row.id
+                lattitude, longitude = row.vejpunkt_y, row.vejpunkt_x
+                road_name = row.adresseringsvejnavn
+                house_number = row.husnr
+                postal_code = row.postnr
+                postal_code_name = row.postnrnavn
 
-            # Check if the data is already in the database
-            if adgangs_adresse_id in self.ids_in_db:
-                continue
+                # Get the BBR data for the given adgangs_adresse_id
+                bbr_data = self.get_bbr_data(adgangs_adresse_id)
+                if len(bbr_data) == 0:
+                    return
 
-            #Extract the data from the row
-            lattitude, longitude = row.vejpunkt_x, row.vejpunkt_y
-            road_name = row.adresseringsvejnavn
-            house_number = row.husnr
-            postal_code = row.postnr
-            postal_code_name = row.postnrnavn
+                # Get the closest school to the building
+                closest_school = self.get_closest_school(lattitude, longitude)
 
-            #Get the BBR data for the given adgangs_adresse_id
-            bbr_data = self.get_bbr_data(adgangs_adresse_id)
+                # Get the closest stations to the building
+                metro_station = get_nearest_station(lattitude, longitude, 'metro')
+                s_train_station = get_nearest_station(lattitude, longitude, 'train')
+                bus_station = get_nearest_station(lattitude, longitude, 'bus')
+                tram_station = get_nearest_station(lattitude, longitude, 'tram')
 
-            # Check if the data is empty
-            if len(bbr_data) == 0:
-                continue
-            
-            # Get the closest school to the building
-            closest_school = self.get_closest_school(lattitude, longitude)
+                # Write the data to the database
+                self.write_to_database(
+                    adgangs_adresse_id,
+                    bbr_data,
+                    lattitude,
+                    longitude,
+                    house_number,
+                    road_name,
+                    postal_code,
+                    metro_station,
+                    s_train_station,
+                    bus_station,
+                    tram_station,
+                    closest_school
+                )
+        
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            futures = [executor.submit(process_row, row) for row in rows]
 
-            # Get the closest stations to the building
-            metro_station = get_nearest_station(lattitude, longitude, 'metro')
-            s_train_station = get_nearest_station(lattitude, longitude, 'train')
-            bus_station = get_nearest_station(lattitude, longitude, 'bus')
-            tram_station = get_nearest_station(lattitude, longitude, 'tram')
+            for idx, future in enumerate(tqdm(as_completed(futures), total=len(rows))):
+                future.result()  # Raise exception if any occurred in threads
 
-            # Write the data to the database
-            self.write_to_database( adgangs_adresse_id,
-                                    bbr_data,
-                                    lattitude,
-                                    longitude,
-                                    house_number,
-                                    road_name,
-                                    postal_code,
-                                    metro_station,
-                                    s_train_station,
-                                    bus_station,
-                                    tram_station,
-                                    closest_school
-                                    )
-            
-            # For every 100 rows take a 5 second break
-            if idx % 500 == 0:
-                sleep(5)
+                # Optional: Sleep every 500 rows to manage API rate limiting
+                if idx % 500 == 0:
+                    sleep(5)
 
         self.db.close()
     
