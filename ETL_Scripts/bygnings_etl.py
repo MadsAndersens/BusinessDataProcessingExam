@@ -20,10 +20,10 @@ class BuildingETL:
     def __init__(self, municipality_id: str):
         self.municipality_id = municipality_id
         self.adress_csv_path = f'Data/Adress_data/Adress_data_{self.municipality_id}.csv'
-        self.fetch_adress_data()
         self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
+        self.fetch_adress_data()
         self.bbr_data = None
-        self.semaphore = Semaphore(100)  # Limit the number of concurrent threads to 100
+        self.semaphore = Semaphore(10)  # Limit the number of concurrent threads to 100
 
         #Temporary fix to avoid duplicates
         #self.db.connect()
@@ -34,11 +34,25 @@ class BuildingETL:
             url = f'https://api.dataforsyningen.dk/adgangsadresser?kommunekode={self.municipality_id}&format=csv'
             dawa_data = pd.read_csv(url) # Fetch the data and save it to a csv file
             dawa_data.to_csv(self.adress_csv_path, index=False)
+        
+        #Figure out how many of the id's exist in the db already and remove the rows that does
+        self.db.connect()
+        self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
+        dawa_data = pd.read_csv(self.adress_csv_path)
+        dawa_data = dawa_data[~dawa_data['id'].isin(self.ids_in_db)]
+        
+        #reverse the order
+        dawa_data = dawa_data.iloc[::-1]
+        dawa_data.to_csv(self.adress_csv_path, index=False)
 
     def get_bbr_data(self, adgangs_adresse_id: str) -> List[Building]:
         
         #Lookup the data from the BBR API
-        bbr_data = lookup_bbr_data(adgangs_adresse_id)
+        try:
+            bbr_data = lookup_bbr_data(adgangs_adresse_id)
+        except Exception as e:
+            write_error_log(f"Error getting BBR data: {e}")
+            return []
 
         #Load the data into the pydantic model
         bbr_data = load_pydantic_model(bbr_data)
@@ -72,7 +86,7 @@ class BuildingETL:
                 # Get the BBR data for the given adgangs_adresse_id
                 bbr_data = self.get_bbr_data(adgangs_adresse_id)
                 if len(bbr_data) == 0:
-                    return
+                    return None
 
                 # Get the closest school to the building
                 closest_school = self.get_closest_school(lattitude, longitude)
@@ -212,7 +226,6 @@ class BuildingETL:
                     %(adgangs_adresse_id)s,
                     NOW()
                 )
-                ON CONFLICT (building_id) DO NOTHING;
                 """
             params = {
                 "building_id": building.id_lokalId,
