@@ -8,5 +8,5 @@ from sql_inserts.postal_code_insert import populate_postal_area
 
 if __name__ == "__main__":
   #init_db()
-  etl = BuildingETL('0101')
+  etl = BuildingETL('0147')
   etl.run_etl()

@@ -30,19 +30,17 @@ class BuildingETL:
         #self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
 
     def fetch_adress_data(self) -> None:
-        if f'Adress_data_{self.municipality_id}.csv' not in os.listdir('Data/Adress_data'):
-            url = f'https://api.dataforsyningen.dk/adgangsadresser?kommunekode={self.municipality_id}&format=csv'
-            dawa_data = pd.read_csv(url) # Fetch the data and save it to a csv file
-            dawa_data.to_csv(self.adress_csv_path, index=False)
+       # if f'Adress_data_{self.municipality_id}.csv' not in os.listdir('Data/Adress_data'):
+        url = f'https://api.dataforsyningen.dk/adgangsadresser?kommunekode={self.municipality_id}&format=csv'
+        dawa_data = pd.read_csv(url) # Fetch the data and save it to a csv file
+        dawa_data.to_csv(self.adress_csv_path, index=False)
         
         #Figure out how many of the id's exist in the db already and remove the rows that does
         self.db.connect()
         self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
-        dawa_data = pd.read_csv(self.adress_csv_path)
         dawa_data = dawa_data[~dawa_data['id'].isin(self.ids_in_db)]
         
         #reverse the order
-        dawa_data = dawa_data.iloc[::-1]
         dawa_data.to_csv(self.adress_csv_path, index=False)
 
     def get_bbr_data(self, adgangs_adresse_id: str) -> List[Building]:
