@@ -92,6 +92,27 @@ class PostgresDB:
         with open(self.error_log_path, "a") as file:
             file.write(error_message + "\n")
 
+    def export_db_to_csv(self) -> None:
+        """
+        Exports all the tables to individual csv files, in the folder Data/DB_Entities
+        """
+        # Initialize the database connection
+        try:
+            # Connect to the database
+            self.connect()
+
+            # Get all the table names
+            tables = self.fetch_data("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';")
+
+            # Export all the tables to csv files
+            for table in tables:
+                table_name = table["table_name"]
+                data = self.fetch_data(f"SELECT * FROM {table_name}", as_df=True)
+                data.to_csv(f"Data/DB_Entities/{table_name}.csv", index=False)
+
+        finally:
+            self.close()
+
 def init_db() -> None:
     """
     Initialize the database by creating the necessary tables.
