@@ -75,11 +75,7 @@ def lookup_bbr_data(adgangsadresse_id: str) -> requests.Response:
     
     # Trin 2: Brug Datafordelerens BBR REST-tjeneste til at hente bygningens oplysninger
     bbr_url = "https://services.datafordeler.dk/BBR/BBRPublic/1/rest/bygning"
-    params = {
-        'username': username,
-        'password': password,
-        "husnummer": adgangsadresse_id
-    }
+    params = {"username": os.environ['DF_USERNAME'],"password": os.environ['DF_PASSWORD'],"husnummer": adgangsadresse_id}
 
     # Brug HTTP Basic Authentication til at sende brugernavn og adgangskode
     response = requests.get(bbr_url, params=params)

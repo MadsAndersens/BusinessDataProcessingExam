@@ -17,7 +17,7 @@ from utils.public_transport import get_nearest_station
 # Define the ETL script, that runs the ETL process for a given municipality
 class BuildingETL:
   
-    def __init__(self, municipality_id: str):
+    def __init__(self, municipality_id: str, over_write = False):
         self.municipality_id = municipality_id
         self.adress_csv_path = f'Data/Adress_data/Adress_data_{self.municipality_id}.csv'
         self.db = PostgresDB("BuildingData","Mads", os.environ['DB_PASSWORD'])
@@ -36,9 +36,10 @@ class BuildingETL:
         dawa_data.to_csv(self.adress_csv_path, index=False)
         
         #Figure out how many of the id's exist in the db already and remove the rows that does
-        self.db.connect()
-        self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
-        dawa_data = dawa_data[~dawa_data['id'].isin(self.ids_in_db)]
+        if not self.over_write:
+            self.db.connect()
+            self.ids_in_db = self.db.fetch_data("SELECT adgangs_adresse_id FROM public.buildings;", as_df=True)['adgangs_adresse_id'].to_list()
+            dawa_data = dawa_data[~dawa_data['id'].isin(self.ids_in_db)]
         
         #reverse the order
         dawa_data.to_csv(self.adress_csv_path, index=False)

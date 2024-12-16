@@ -8,9 +8,9 @@ from sql_inserts.postal_code_insert import populate_postal_area
 
 if __name__ == "__main__":
   #init_db()
-  db = PostgresDB("BuildingData","Mads",os.environ['DB_PASSWORD'])
-  db.connect()
-  db.export_db_to_csv()
+  #db = PostgresDB("BuildingData","Mads",os.environ['DB_PASSWORD'])
+  #db.connect()
+  #db.export_db_to_csv()
 
-  #etl = BuildingETL('0147')
-  #etl.run_etl()
+  etl = BuildingETL('0147')
+  etl.run_etl()
